@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legal Q&A Hallucination Detector — Cross-LLM Refinement</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+    --primary: #5c4033;
+    --primary-light: #8b4513;
+    --accent: #d4af37;
+    --success: #2e7d32;
+    --danger: #c62828;
+    --warning: #b8860b;
+    --muted: #8b7355;
+    --info: #1565c0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
+body { background: #f5f1ea; min-height: 100vh; padding: 20px; }
+.container {
+    width: 100%; max-width: 1200px; margin: 0 auto; background: white;
+    border-radius: 16px; box-shadow: 0 10px 30px rgba(92,64,51,0.2); overflow: hidden;
+}
+.header { background: var(--primary); color: white; padding: 24px 30px; text-align: center; border-bottom: 4px solid var(--accent); }
+.header h1 { font-size: 1.8rem; }
+.header p { opacity: 0.85; margin-top: 6px; font-style: italic; }
+
+.tabs { display: flex; border-bottom: 2px solid #eee; }
+.tab-btn { flex: 1; padding: 14px; background: none; border: none; font-size: 1rem; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--accent); }
+.tab-content { display: none; padding: 25px 30px; }
+.tab-content.active { display: block; }
+
+.input-row { display: flex; gap: 10px; margin-bottom: 20px; }
+select, input[type=text] { padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+select { width: 140px; }
+input[type=text] { flex: 1; }
+button { padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+button:hover { background: var(--primary-light); }
+button:disabled { background: #ccc; cursor: not-allowed; }
+
+.loading { display: none; padding: 15px; color: var(--muted); font-style: italic; }
+
+.stage-label {
+    display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: white; margin-bottom: 10px;
+}
+.stage-llm1 { background: #a0522d; }
+.stage-llm2 { background: var(--info); }
+
+.result-card { margin-top: 20px; border: 1px solid #eee; border-radius: 10px; overflow: hidden; }
+.verdict-banner { padding: 14px 18px; font-weight: 700; font-size: 1.05rem; color: white; }
+.verdict-grounded { background: var(--success); }
+.verdict-hallucination { background: var(--danger); }
+.verdict-noref { background: var(--warning); }
+
+.section { padding: 16px 18px; border-bottom: 1px solid #f0ede8; }
+.section:last-child { border-bottom: none; }
+.section-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
+.section-body { color: #333; line-height: 1.6; }
+
+.citation-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.citation-pill { padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; }
+.citation-grounded { background: #e8f5e9; color: var(--success); }
+.citation-unverified { background: #ffebee; color: var(--danger); }
+
+.score-row { display: flex; gap: 24px; flex-wrap: wrap; }
+.score-box { text-align: center; min-width: 90px; }
+.score-value { font-size: 1.4rem; font-weight: 700; color: var(--primary); }
+.score-label { font-size: 0.8rem; color: var(--muted); }
+.score-sublabel { font-size: 0.7rem; color: #aaa; font-style: italic; margin-top: 2px; }
+
+.critique-box {
+    margin: 20px 0; padding: 18px; background: #eef4fb; border-left: 4px solid var(--info);
+    border-radius: 8px; color: #26415c; line-height: 1.6; white-space: pre-wrap;
+}
+.critique-box .section-label { color: var(--info); }
+
+.delta-banner {
+    margin: 15px 0; padding: 14px 18px; border-radius: 8px; font-weight: 600;
+}
+.delta-good { background: #e8f5e9; color: var(--success); border-left: 4px solid var(--success); }
+.delta-bad { background: #fff3e0; color: var(--warning); border-left: 4px solid var(--warning); }
+
+.chart-row { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
+.chart-col { flex: 1; min-width: 280px; background: white; border: 1px solid #eee; border-radius: 10px; padding: 15px; }
+.chart-title { font-weight: bold; color: var(--primary); margin-bottom: 4px; text-align: center; font-size: 1rem; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
+.chart-subtitle { text-align: center; font-size: 0.75rem; color: var(--muted); font-style: italic; margin-bottom: 8px; }
+canvas { max-height: 300px !important; width: 100% !important; }
+
+table.batch-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+table.batch-table th, table.batch-table td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+table.batch-table th { background: #faf7f3; color: var(--primary); }
+table.batch-table th small { display: block; font-weight: 400; color: var(--muted); font-size: 0.7rem; }
+.verdict-tag { padding: 3px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; color: white; }
+
+@media (max-width: 768px) {
+    .chart-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Indian Legal Q&A — Hallucination Detector</h1>
+        <p>Cross-LLM refinement: fine-tuned draft → grounded critique → regeneration</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="ask">Ask a Question</button>
+        <button class="tab-btn" data-tab="batch">Calibration Results</button>
+    </div>
+
+    <div class="tab-content active" id="tab-ask">
+        <div class="input-row">
+            <select id="lang-select">
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="pa">Punjabi</option>
+                <option value="ne">Nepali</option>
+            </select>
+            <input type="text" id="question-input" placeholder="Type your legal question here...">
+            <button id="ask-btn">Ask</button>
+        </div>
+        <div class="loading" id="loading">Running LLM1 draft → retrieval → LLM2 critique → refinement...</div>
+        <div id="result-container"></div>
+    </div>
+
+    <div class="tab-content" id="tab-batch">
+        <p style="color:#8b7355; margin-bottom:15px;">Results from <code>run_batch_eval.py</code> — real model outputs checked against the detector.</p>
+        <div id="batch-container">Loading...</div>
+    </div>
+</div>
+
+<script>
+const tabBtns = document.querySelectorAll(".tab-btn");
+const tabContents = document.querySelectorAll(".tab-content");
+tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+        tabBtns.forEach(b => b.classList.remove("active"));
+        tabContents.forEach(c => c.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+        if (btn.dataset.tab === "batch") loadBatchResults();
+    });
+});
+
+const askBtn = document.getElementById("ask-btn");
+const questionInput = document.getElementById("question-input");
+const langSelect = document.getElementById("lang-select");
+const loading = document.getElementById("loading");
+const resultContainer = document.getElementById("result-container");
+let chartCounter = 0;
+
+askBtn.addEventListener("click", handleAsk);
+questionInput.addEventListener("keypress", e => { if (e.key === "Enter") handleAsk(); });
+
+function verdictClass(verdict) {
+    if (!verdict) return "verdict-noref";
+    if (verdict.includes("GROUNDED")) return "verdict-grounded";
+    if (verdict.includes("NO CONFIDENT")) return "verdict-noref";
+    return "verdict-hallucination";
+}
+
+// Backwards-compatible accessor: older backend responses (pre-fix) only ever
+// sent a single "hallucination_score" field that actually behaved like a
+// grounding score (higher = better). If "grounding_score" isn't present on
+// a result, fall back to reading it out of "hallucination_score" so this
+// page still renders sensibly against either backend version.
+function getGroundingScore(result) {
+    if (!result) return null;
+    if (result.grounding_score !== undefined && result.grounding_score !== null) {
+        return result.grounding_score;
+    }
+    if (result.hallucination_score !== undefined && result.hallucination_score !== null) {
+        return result.hallucination_score; // legacy backend: this WAS the grounding score
+    }
+    return null;
+}
+
+function getHallucinationScore(result) {
+    if (!result) return null;
+    if (result.hallucination_score !== undefined && result.hallucination_score !== null
+        && result.grounding_score !== undefined && result.grounding_score !== null) {
+        // New backend: both fields present and mutually consistent, trust it directly.
+        return result.hallucination_score;
+    }
+    const g = getGroundingScore(result);
+    return g !== null ? Math.round((1 - g) * 1000) / 1000 : null;
+}
+
+async function handleAsk() {
+    const question = questionInput.value.trim();
+    const lang = langSelect.value;
+    if (!question) return;
+
+    askBtn.disabled = true;
+    loading.style.display = "block";
+    resultContainer.innerHTML = "";
+
+    try {
+        const res = await fetch("/ask", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ question, lang })
+        });
+        const data = await res.json();
+        loading.style.display = "none";
+        askBtn.disabled = false;
+
+        if (data.error) {
+            resultContainer.innerHTML = `<div class="section" style="color:red;">${data.error}</div>`;
+            return;
+        }
+        renderResult(data);
+    } catch (err) {
+        loading.style.display = "none";
+        askBtn.disabled = false;
+        resultContainer.innerHTML = `<div class="section" style="color:red;">Error: ${err.message}</div>`;
+    }
+}
+
+function renderResultCard(stageLabelClass, stageLabelText, answer, result) {
+    if (!result) return "";
+    const vClass = verdictClass(result.verdict);
+    const ref = result.retrieved_reference;
+    const cc = result.citation_check;
+    const sc = result.similarity_check;
+    const grounding = getGroundingScore(result);
+    const hallucination = getHallucinationScore(result);
+
+    let citationHTML = "";
+    if (cc) {
+        const grounded = (cc.grounded_citations || []).map(c => `<span class="citation-pill citation-grounded">✓ ${c}</span>`).join("");
+        const unverified = (cc.unverified_citations || []).map(c => `<span class="citation-pill citation-unverified">✗ ${c}</span>`).join("");
+        citationHTML = `
+            <div class="section">
+                <div class="section-label">Citation Grounding</div>
+                <div class="citation-row">${grounded}${unverified || (grounded ? '' : '<span style="color:#999;">No citations found in answer</span>')}</div>
+            </div>`;
+    }
+
+    let scoresHTML = "";
+    if (sc || grounding !== null) {
+        scoresHTML = `
+            <div class="section">
+                <div class="score-row">
+                    <div class="score-box">
+                        <div class="score-value">${hallucination ?? "—"}</div>
+                        <div class="score-label">Hallucination Score</div>
+                        <div class="score-sublabel">lower is better</div>
+                    </div>
+                    <div class="score-box">
+                        <div class="score-value">${grounding ?? "—"}</div>
+                        <div class="score-label">Grounding Score</div>
+                        <div class="score-sublabel">higher is better</div>
+                    </div>
+                    <div class="score-box">
+                        <div class="score-value">${sc ? sc.similarity_score.toFixed(3) : "—"}</div>
+                        <div class="score-label">Similarity to Reference</div>
+                    </div>
+                    <div class="score-box">
+                        <div class="score-value">${result.top_matches && result.top_matches[0] ? result.top_matches[0].score.toFixed(3) : (result.retrieval_confidence ?? "—")}</div>
+                        <div class="score-label">Retrieval Confidence</div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    return `
+        <div class="result-card">
+            <div style="padding: 10px 18px 0;"><span class="stage-label ${stageLabelClass}">${stageLabelText}</span></div>
+            <div class="verdict-banner ${vClass}">${result.verdict}</div>
+            <div class="section">
+                <div class="section-label">Answer</div>
+                <div class="section-body">${answer}</div>
+            </div>
+            ${ref ? `
+            <div class="section">
+                <div class="section-label">Retrieved Reference (${ref.lang}, ${ref.act})</div>
+                <div class="section-body"><b>Q:</b> ${ref.question}<br><b>A:</b> ${ref.answer}</div>
+            </div>` : ""}
+            ${citationHTML}
+            ${scoresHTML}
+        </div>`;
+}
+
+function renderResult(data) {
+    let html = "";
+
+    // Stage 1: LLM1 initial draft, always shown
+    html += renderResultCard("stage-llm1", "LLM1 — Initial Draft", data.initial_answer, data.initial_result);
+
+    if (!data.refinement_ran) {
+        html += `<div class="section" style="color:var(--muted); font-style:italic; padding-left:0;">${data.reason || ""}</div>`;
+        resultContainer.innerHTML = html;
+        if (data.initial_result && data.initial_result.top_matches) {
+            renderTopMatchesChart(data.initial_result.top_matches);
+        }
+        renderSingleStageExtras(data.initial_answer, data.initial_result);
+        return;
+    }
+
+    // Stage 2: LLM2 critique
+    html += `
+        <div class="critique-box">
+            <div class="section-label">LLM2 — Critique (grounded strictly in the retrieved reference)</div>
+            ${data.critique}
+        </div>`;
+
+    // Stage 3: LLM1 refined answer
+    html += renderResultCard("stage-llm1", "LLM1 — Refined Answer", data.refined_answer, data.refined_result);
+
+    // Delta summary — computed directly from the two result objects rather
+    // than trusting a pre-baked "score_delta"/"improved" field from the
+    // backend, so this stays correct regardless of backend field naming.
+    const initGrounding = getGroundingScore(data.initial_result);
+    const refGrounding = getGroundingScore(data.refined_result);
+    let improved, deltaText;
+    if (initGrounding !== null && refGrounding !== null) {
+        const delta = Math.round((refGrounding - initGrounding) * 1000) / 1000;
+        improved = delta > 0;
+        deltaText = `${delta >= 0 ? "+" : ""}${delta} (higher is better)`;
+    } else {
+        improved = !!data.improved;
+        deltaText = data.score_delta !== undefined ? `${data.score_delta}` : "—";
+    }
+
+    const deltaClass = improved ? "delta-good" : "delta-bad";
+    html += `
+        <div class="delta-banner ${deltaClass}">
+            ${improved ? "✅ Refinement improved grounding" : "⚠️ Refinement did not improve grounding"}
+            — grounding score change: ${deltaText}
+        </div>`;
+
+    resultContainer.innerHTML = html;
+    renderComparisonCharts(data);
+}
+
+function renderComparisonCharts(data) {
+    const chartsWrap = document.createElement("div");
+    chartsWrap.className = "chart-row";
+    resultContainer.appendChild(chartsWrap);
+
+    const initial = data.initial_result || {};
+    const refined = data.refined_result || {};
+
+    // Chart 1: Grounding score before/after (higher = better, bars rising = improvement)
+    addChart(chartsWrap, "Grounding Score", "higher is better", (ctx) => new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["Initial Draft", "Refined Answer"],
+            datasets: [{
+                label: "Grounding Score",
+                data: [getGroundingScore(initial) ?? 0, getGroundingScore(refined) ?? 0],
+                backgroundColor: ["rgba(160,82,45,0.7)", "rgba(21,101,192,0.7)"]
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 1 } }, plugins: { legend: { display: false } } }
+    }));
+
+    // Chart 2: Similarity to reference before/after
+    addChart(chartsWrap, "Similarity to Reference", null, (ctx) => new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["Initial Draft", "Refined Answer"],
+            datasets: [{
+                label: "Similarity Score",
+                data: [
+                    initial.similarity_check ? initial.similarity_check.similarity_score : 0,
+                    refined.similarity_check ? refined.similarity_check.similarity_score : 0
+                ],
+                backgroundColor: ["rgba(160,82,45,0.7)", "rgba(21,101,192,0.7)"]
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 1 } }, plugins: { legend: { display: false } } }
+    }));
+
+    // Chart 3: Grounded vs unverified citation counts, before/after
+    const initCC = initial.citation_check || { grounded_citations: [], unverified_citations: [] };
+    const refCC = refined.citation_check || { grounded_citations: [], unverified_citations: [] };
+    addChart(chartsWrap, "Citation Grounding Counts", null, (ctx) => new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["Grounded", "Unverified"],
+            datasets: [
+                { label: "Initial Draft", data: [initCC.grounded_citations.length, initCC.unverified_citations.length], backgroundColor: "rgba(160,82,45,0.7)" },
+                { label: "Refined Answer", data: [refCC.grounded_citations.length, refCC.unverified_citations.length], backgroundColor: "rgba(21,101,192,0.7)" }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    }));
+
+    // Chart 4: Top retrieval matches (from initial retrieval — same reference used throughout)
+    if (initial.top_matches && initial.top_matches.length > 0) {
+        addChart(chartsWrap, "Top Similar Legal Questions", null, (ctx) => new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: initial.top_matches.map(m => m.question.substring(0, 40) + (m.question.length > 40 ? "..." : "")),
+                datasets: [{ label: "Similarity Score", data: initial.top_matches.map(m => m.score), backgroundColor: "rgba(92,64,51,0.6)" }]
+            },
+            options: {
+                indexAxis: "y", responsive: true, maintainAspectRatio: false,
+                scales: { x: { min: 0, max: 1 } }, plugins: { legend: { display: false } }
+            }
+        }));
+    }
+
+    // Chart 5: Metric profile radar — Initial vs Refined on one chart, using
+    // every numeric signal the detector actually returns (grounding, raw
+    // similarity, BLEU, ROUGE-L, retrieval confidence). This is the radar
+    // view from the earlier dashboard, adapted to the fields this backend
+    // produces instead of a fixed precision/recall/F1/BERTScore set.
+    addChart(chartsWrap, "Metric Profile Comparison", null, (ctx) => new Chart(ctx, {
+        type: "radar",
+        data: {
+            labels: ["Grounding Score", "Similarity", "BLEU", "ROUGE-L", "Retrieval Confidence"],
+            datasets: [
+                {
+                    label: "Initial Draft",
+                    data: radarValues(initial),
+                    backgroundColor: "rgba(160,82,45,0.2)",
+                    borderColor: "rgba(160,82,45,1)",
+                    pointBackgroundColor: "rgba(160,82,45,1)",
+                    borderWidth: 2
+                },
+                {
+                    label: "Refined Answer",
+                    data: radarValues(refined),
+                    backgroundColor: "rgba(21,101,192,0.2)",
+                    borderColor: "rgba(21,101,192,1)",
+                    pointBackgroundColor: "rgba(21,101,192,1)",
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { r: { suggestedMin: 0, suggestedMax: 1, ticks: { stepSize: 0.2 } } },
+            plugins: { legend: { position: "bottom" } }
+        }
+    }));
+
+    // Token-match charts (own full-width row — token labels need horizontal
+    // room). Compares each stage's answer against the retrieved reference
+    // answer, token by token: green = appears in reference, red = doesn't.
+    const tokenRow = document.createElement("div");
+    tokenRow.className = "chart-row";
+    resultContainer.appendChild(tokenRow);
+
+    const initRefText = initial.retrieved_reference ? initial.retrieved_reference.answer : "";
+    const refRefText = refined.retrieved_reference ? refined.retrieved_reference.answer : initRefText;
+
+    addTokenMatchChart(tokenRow, "Initial Draft — Token Match vs. Reference", data.initial_answer, initRefText);
+    addTokenMatchChart(tokenRow, "Refined Answer — Token Match vs. Reference", data.refined_answer, refRefText);
+}
+
+// Renders a metric radar + token-match chart for the single-stage case
+// (initial draft already grounded, no refinement triggered).
+function renderSingleStageExtras(answerText, result) {
+    if (!result || result.grounding_score === undefined && result.hallucination_score === undefined) return;
+
+    const chartsWrap = document.createElement("div");
+    chartsWrap.className = "chart-row";
+    resultContainer.appendChild(chartsWrap);
+
+    addChart(chartsWrap, "Metric Profile", null, (ctx) => new Chart(ctx, {
+        type: "radar",
+        data: {
+            labels: ["Grounding Score", "Similarity", "BLEU", "ROUGE-L", "Retrieval Confidence"],
+            datasets: [{
+                label: "Initial Draft",
+                data: radarValues(result),
+                backgroundColor: "rgba(160,82,45,0.2)",
+                borderColor: "rgba(160,82,45,1)",
+                pointBackgroundColor: "rgba(160,82,45,1)",
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { r: { suggestedMin: 0, suggestedMax: 1, ticks: { stepSize: 0.2 } } },
+            plugins: { legend: { display: false } }
+        }
+    }));
+
+    const tokenRow = document.createElement("div");
+    tokenRow.className = "chart-row";
+    resultContainer.appendChild(tokenRow);
+    const refText = result.retrieved_reference ? result.retrieved_reference.answer : "";
+    addTokenMatchChart(tokenRow, "Initial Draft — Token Match vs. Reference", answerText, refText);
+}
+
+// Pulls the 5 radar axis values out of a result object, defaulting missing
+// signals to 0 rather than throwing, so a partially-populated result still renders.
+function radarValues(result) {
+    if (!result) return [0, 0, 0, 0, 0];
+    const grounding = getGroundingScore(result) ?? 0;
+    const sc = result.similarity_check || {};
+    const retrievalConf = (result.top_matches && result.top_matches[0]) ? result.top_matches[0].score
+        : (result.retrieval_confidence ?? 0);
+    return [
+        grounding,
+        sc.similarity_score ?? 0,
+        sc.bleu_score ?? 0,
+        sc.rouge_l_score ?? 0,
+        retrievalConf
+    ];
+}
+
+// Simple whitespace tokenizer — mirrors the backend's simple_tokenize(),
+// which is deliberately script-agnostic (works reasonably across en/hi/pa/ne)
+// rather than using an English-tuned tokenizer.
+function simpleTokenize(text) {
+    if (!text) return [];
+    return text.trim().split(/\s+/).filter(Boolean);
+}
+
+function addTokenMatchChart(wrap, title, answerText, referenceText) {
+    if (!answerText) return;
+    const col = document.createElement("div");
+    col.className = "chart-col";
+    const canvasId = `chart_${chartCounter++}`;
+    col.innerHTML = `<div class="chart-title">${title}</div><div class="chart-subtitle">green = token appears in retrieved reference</div><canvas id="${canvasId}"></canvas>`;
+    wrap.appendChild(col);
+
+    const tokens = simpleTokenize(answerText).slice(0, 25);
+    const refTokenSet = new Set(simpleTokenize(referenceText));
+    const values = tokens.map(t => refTokenSet.has(t) ? 1 : 0);
+    const colors = values.map(v => v ? "rgba(46,125,50,0.75)" : "rgba(198,40,40,0.75)");
+
+    setTimeout(() => {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        new Chart(canvas.getContext("2d"), {
+            type: "bar",
+            data: {
+                labels: tokens,
+                datasets: [{ label: "Token in reference (1=yes, 0=no)", data: values, backgroundColor: colors }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { min: 0, max: 1, ticks: { stepSize: 1 } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }, 50);
+}
+
+function renderTopMatchesChart(topMatches) {
+    if (!topMatches || topMatches.length === 0) return;
+    const chartsWrap = document.createElement("div");
+    chartsWrap.className = "chart-row";
+    resultContainer.appendChild(chartsWrap);
+    addChart(chartsWrap, "Top Similar Legal Questions", null, (ctx) => new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: topMatches.map(m => m.question.substring(0, 40) + (m.question.length > 40 ? "..." : "")),
+            datasets: [{ label: "Similarity Score", data: topMatches.map(m => m.score), backgroundColor: "rgba(92,64,51,0.6)" }]
+        },
+        options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, scales: { x: { min: 0, max: 1 } }, plugins: { legend: { display: false } } }
+    }));
+}
+
+function addChart(wrap, title, subtitle, buildFn) {
+    const col = document.createElement("div");
+    col.className = "chart-col";
+    const canvasId = `chart_${chartCounter++}`;
+    col.innerHTML = `<div class="chart-title">${title}</div>${subtitle ? `<div class="chart-subtitle">${subtitle}</div>` : ""}<canvas id="${canvasId}"></canvas>`;
+    wrap.appendChild(col);
+    setTimeout(() => {
+        const canvas = document.getElementById(canvasId);
+        if (canvas) buildFn(canvas.getContext("2d"));
+    }, 50);
+}
+
+async function loadBatchResults() {
+    const container = document.getElementById("batch-container");
+    container.innerHTML = "Loading...";
+    try {
+        const res = await fetch("/batch_results");
+        const data = await res.json();
+        if (data.error) {
+            container.innerHTML = `<div style="color:red;">${data.error}</div>`;
+            return;
+        }
+        renderBatchTable(data);
+    } catch (err) {
+        container.innerHTML = `<div style="color:red;">Error: ${err.message}</div>`;
+    }
+}
+
+function batchVerdictColor(v) {
+    if (!v) return "#999";
+    if (v.includes("GROUNDED")) return "#2e7d32";
+    if (v.includes("NO CONFIDENT")) return "#b8860b";
+    return "#c62828";
+}
+
+function renderBatchTable(rows) {
+    const container = document.getElementById("batch-container");
+    if (!rows.length) { container.innerHTML = "No results found."; return; }
+    let html = `<table class="batch-table"><thead><tr>
+        <th>Lang</th><th>Question</th><th>Verdict</th>
+        <th>Hallucination Score<br><small>lower is better</small></th>
+        <th>Grounding Score<br><small>higher is better</small></th>
+        <th>Retrieval Score</th>
+    </tr></thead><tbody>`;
+    rows.forEach(r => {
+        const color = batchVerdictColor(r.verdict);
+        const grounding = r.grounding_score !== undefined ? r.grounding_score : r.hallucination_score;
+        html += `<tr>
+            <td>${r.lang}</td>
+            <td>${r.question}</td>
+            <td><span class="verdict-tag" style="background:${color};">${r.verdict}</span></td>
+            <td>${r.hallucination_score}</td>
+            <td>${grounding}</td>
+            <td>${r.top1_retrieval_score}</td>
+        </tr>`;
+    });
+    html += "</tbody></table>";
+    container.innerHTML = html;
+}
+</script>
+</body>
+</html>

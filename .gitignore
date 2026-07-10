@@ -1,0 +1,89 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+*.swp
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Model Cache
+# =========================
+.cache/
+huggingface_cache/
+
+# =========================
+# FAISS Index (generated)
+# Uncomment if recreated automatically
+# =========================
+faiss_index/
+
+# =========================
+# Generated Outputs
+# =========================
+results_*.csv
+results_*.txt
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Testing
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Type checking
+# =========================
+.mypy_cache/
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.bak
+
+# FAISS generated index
+faiss_index/
+
+# LoRA adapters
+adapters/
