@@ -9,9 +9,18 @@
 # what keeps a free-text critic model from becoming its own hallucination
 # source (the failure mode your old flan-t5-small/base prototype didn't
 # guard against at all).
+#
+# Also doubles as the small-task LLM for two other constrained jobs that
+# don't warrant their own model load — same pattern as rewrite_followup:
+#   - classify_intent(): routes a question to a pipeline branch (see
+#     intent_classifier.py, which calls this only when its cheap keyword
+#     heuristic can't decide on its own).
+#   - extract_slots(): pulls stated form-field values out of a drafting
+#     request (see draft_generator.py) without inventing missing ones.
 
 import torch
 import gc
+import json
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 import logging
 
@@ -120,12 +129,94 @@ class CriticLLM:
         ]
         return self._generate(messages, MAX_CRITIQUE_TOKENS)
 
+    
+    def rewrite_followup(self, context_text: str, followup_question: str) -> str:
+        """Rewrites a follow-up question ('what about the punishment for
+        that?') into a standalone question, using recent Q/A turns as
+        context. Deliberately a SMALL, constrained task — rewrite only,
+        no new legal facts — so this can't become its own hallucination
+        source. Reuses the same loaded critic model as critique()."""
+        system_prompt = (
+            "You rewrite a follow-up question into a standalone question, "
+            "using the conversation so far ONLY to resolve pronouns and "
+            "references (e.g. 'that', 'it', 'the same act'). Do not answer "
+            "the question. Do not add any new legal fact. Output ONLY the "
+            "rewritten standalone question, nothing else."
+        )
+        user_prompt = (
+            f"Conversation so far:\n{context_text}\n\n"
+            f"Follow-up question: {followup_question}\n\n"
+            f"Standalone question:"
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        return self._generate(messages, max_new_tokens=60)
+
+    def classify_intent(self, question: str, doc_present: bool) -> str:
+        """Routes a question to one of four pipeline branches. Called by
+        intent_classifier.classify() ONLY when its cheap keyword heuristic
+        couldn't decide on its own — see that module's docstring. Deliberately
+        constrained to output a single category token, nothing else, so a
+        malformed/rambling response can't accidentally slip past the caller's
+        VALID_INTENTS check silently (classify() falls back to
+        'legal_knowledge' if this returns anything unexpected)."""
+        system_prompt = (
+            "Classify the user's legal question into EXACTLY ONE of these "
+            "categories: legal_knowledge, document_qa, explanation, drafting.\n"
+            "- legal_knowledge: a general legal question not about a specific uploaded document.\n"
+            "- document_qa: a targeted factual question about a specific uploaded document.\n"
+            "- explanation: a request to explain/summarize/simplify an uploaded document.\n"
+            "- drafting: a request to draft/generate a legal document (agreement, notice, "
+            "affidavit, application, etc).\n"
+            "Output ONLY the category name, nothing else — no punctuation, no explanation."
+        )
+        doc_note = "A document IS currently uploaded." if doc_present else "No document is uploaded."
+        user_prompt = f"{doc_note}\n\nQuestion: {question}\n\nCategory:"
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        return self._generate(messages, max_new_tokens=10)
+
+    def extract_slots(self, question: str, required_slots: list) -> dict:
+        """Pulls out whatever slot values (names, dates, amounts, addresses)
+        the user has ALREADY stated in their message, for draft_generator.py.
+        Deliberately instructed to omit anything not explicitly stated rather
+        than guess — draft_generator.py treats a missing key as 'ask the user',
+        never as 'fill with a placeholder'. Returns {} on any parse failure so
+        a malformed LLM response degrades to 'ask the user for everything'
+        rather than silently fabricating a value."""
+        system_prompt = (
+            "Extract any of the following fields the user has explicitly "
+            f"stated in their message: {', '.join(required_slots)}.\n"
+            "Output ONLY a single JSON object with the fields you found — "
+            "omit any field you did not find. Do not guess, infer, or invent "
+            "a value for a field that wasn't stated. Output nothing except "
+            "the JSON object."
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question},
+        ]
+        raw = self._generate(messages, max_new_tokens=200)
+        try:
+            # Strip markdown code fences if the model wraps its JSON in them
+            # despite the instruction not to.
+            cleaned = raw.strip().strip("`")
+            if cleaned.lower().startswith("json"):
+                cleaned = cleaned[4:].strip()
+            parsed = json.loads(cleaned)
+            return parsed if isinstance(parsed, dict) else {}
+        except (json.JSONDecodeError, ValueError):
+            return {}
+
     def unload(self):
         del self.model
         self.model = None
         gc.collect()
         torch.cuda.empty_cache()
-
-
+   
 # ── Singleton, mirroring model_loader's pattern ──
 critic_llm = CriticLLM()

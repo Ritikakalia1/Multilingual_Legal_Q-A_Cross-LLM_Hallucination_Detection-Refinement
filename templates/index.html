@@ -15,6 +15,9 @@
     --warning: #b8860b;
     --muted: #8b7355;
     --info: #1565c0;
+    --abstain: #5e548e;
+    --draft: #b8860b;
+    --explain: #6a4c93;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
 body { background: #f5f1ea; min-height: 100vh; padding: 20px; }
@@ -22,7 +25,7 @@ body { background: #f5f1ea; min-height: 100vh; padding: 20px; }
     width: 100%; max-width: 1200px; margin: 0 auto; background: white;
     border-radius: 16px; box-shadow: 0 10px 30px rgba(92,64,51,0.2); overflow: hidden;
 }
-.header { background: var(--primary); color: white; padding: 24px 30px; text-align: center; border-bottom: 4px solid var(--accent); }
+.header { background: var(--primary); color: white; padding: 24px 30px; text-align: center; border-bottom: 4px solid var(--accent); position: relative; }
 .header h1 { font-size: 1.8rem; }
 .header p { opacity: 0.85; margin-top: 6px; font-style: italic; }
 
@@ -33,14 +36,50 @@ body { background: #f5f1ea; min-height: 100vh; padding: 20px; }
 .tab-content.active { display: block; }
 
 .input-row { display: flex; gap: 10px; margin-bottom: 20px; }
-select, input[type=text] { padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+select, input[type=text], textarea { padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; font-family: inherit; }
 select { width: 140px; }
 input[type=text] { flex: 1; }
-button { padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+textarea { flex: 1; resize: vertical; }
+button { padding: 12px 24px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
 button:hover { background: var(--primary-light); }
 button:disabled { background: #ccc; cursor: not-allowed; }
+button.secondary { background: white; color: var(--danger); border: 1px solid var(--danger); }
+button.secondary:hover { background: #ffebee; }
+button.ghost { background: white; color: var(--primary); border: 1px solid #ddd; }
+button.ghost:hover { background: #faf7f3; }
 
 .loading { display: none; padding: 15px; color: var(--muted); font-style: italic; }
+
+.doc-panel {
+    border: 1px dashed #d8cfc2; border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; background: #fbf9f6;
+}
+.doc-panel-header { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.doc-status-active {
+    display: none; align-items: center; justify-content: space-between; gap: 10px;
+    background: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+    font-size: 0.9rem; color: var(--success);
+}
+.doc-status-active.show { display: flex; }
+.doc-status-msg { font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+.doc-status-msg.error { color: var(--danger); }
+
+.toolbar-row { display: flex; justify-content: flex-end; margin-bottom: 12px; align-items: center; gap: 10px; }
+
+.draft-mode-banner {
+    display: none; align-items: center; justify-content: space-between; gap: 10px;
+    background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+    font-size: 0.85rem; color: #6b4f00;
+}
+.draft-mode-banner.show { display: flex; }
+
+.chat-turn { border-top: 2px solid #f0ede8; padding-top: 18px; margin-top: 18px; }
+.chat-turn:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.user-question { font-weight: 700; color: var(--primary); padding: 8px 0 4px; font-size: 1.05rem; }
+.interpreted-note { padding: 0 0 8px; color: var(--muted); font-size: 0.8rem; font-style: italic; }
+.retrieval-warning {
+    margin: 8px 0 14px; padding: 10px 14px; background: #fff3e0; border-left: 4px solid var(--warning);
+    border-radius: 6px; color: #6b4f00; font-size: 0.85rem; line-height: 1.5;
+}
 
 .stage-label {
     display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem;
@@ -48,12 +87,16 @@ button:disabled { background: #ccc; cursor: not-allowed; }
 }
 .stage-llm1 { background: #a0522d; }
 .stage-llm2 { background: var(--info); }
+.stage-doc { background: #6a4c93; }
+.stage-draft { background: var(--draft); }
+.stage-explain { background: var(--explain); }
 
 .result-card { margin-top: 20px; border: 1px solid #eee; border-radius: 10px; overflow: hidden; }
 .verdict-banner { padding: 14px 18px; font-weight: 700; font-size: 1.05rem; color: white; }
 .verdict-grounded { background: var(--success); }
 .verdict-hallucination { background: var(--danger); }
 .verdict-noref { background: var(--warning); }
+.verdict-abstain { background: var(--abstain); }
 
 .section { padding: 16px 18px; border-bottom: 1px solid #f0ede8; }
 .section:last-child { border-bottom: none; }
@@ -83,6 +126,42 @@ button:disabled { background: #ccc; cursor: not-allowed; }
 .delta-good { background: #e8f5e9; color: var(--success); border-left: 4px solid var(--success); }
 .delta-bad { background: #fff3e0; color: var(--warning); border-left: 4px solid var(--warning); }
 
+.draft-missing-list { margin-left: 18px; }
+.draft-missing-list li { margin-bottom: 4px; }
+.draft-document-text {
+    white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; font-size: 0.9rem;
+    background: #faf7f3; padding: 16px; border-radius: 8px; border: 1px solid #eee; line-height: 1.5;
+}
+.draft-hint { margin-top: 10px; color: var(--muted); font-size: 0.85rem; font-style: italic; }
+.no-template-note { color: var(--muted); font-style: italic; }
+
+/* ── About Project tab ── */
+.about-wrap h2 { color: var(--primary); font-size: 1.25rem; margin: 28px 0 10px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+.about-wrap h2:first-child { margin-top: 0; }
+.about-wrap p { color: #333; line-height: 1.7; margin-bottom: 10px; }
+.about-wrap code { background: #f0ede8; padding: 2px 6px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.85em; color: var(--primary-light); }
+.about-diagram {
+    background: #2b2b2b; color: #d8d0c5; padding: 18px 20px; border-radius: 10px;
+    font-family: 'Courier New', Courier, monospace; font-size: 0.82rem; line-height: 1.5;
+    overflow-x: auto; white-space: pre;
+}
+.about-callout {
+    margin: 14px 0; padding: 14px 16px; background: #fff8e1; border-left: 4px solid var(--warning);
+    border-radius: 6px; color: #6b4f00; font-size: 0.9rem; line-height: 1.6;
+}
+.about-decision-list, .limitation-list { margin-left: 20px; margin-bottom: 12px; }
+.about-decision-list li, .limitation-list li { margin-bottom: 10px; line-height: 1.6; color: #333; }
+table.about-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 10px 0 20px; }
+table.about-table th, table.about-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #eee; }
+table.about-table th { background: #faf7f3; color: var(--primary); }
+.stack-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 20px; }
+.stack-pill { background: #faf7f3; border: 1px solid #e5ddd0; color: var(--primary); padding: 5px 12px; border-radius: 14px; font-size: 0.82rem; }
+.about-codeblock {
+    background: #2b2b2b; color: #b7e0a0; padding: 14px 18px; border-radius: 8px;
+    font-family: 'Courier New', Courier, monospace; font-size: 0.82rem; line-height: 1.6; overflow-x: auto;
+}
+.about-codeblock .cmt { color: #8a8a8a; }
+
 .chart-row { display: flex; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
 .chart-col { flex: 1; min-width: 280px; background: white; border: 1px solid #eee; border-radius: 10px; padding: 15px; }
 .chart-title { font-weight: bold; color: var(--primary); margin-bottom: 4px; text-align: center; font-size: 1rem; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
@@ -97,6 +176,8 @@ table.batch-table th small { display: block; font-weight: 400; color: var(--mute
 
 @media (max-width: 768px) {
     .chart-row { flex-direction: column; }
+    .input-row { flex-direction: column; }
+    select { width: 100%; }
 }
 </style>
 </head>
@@ -110,9 +191,41 @@ table.batch-table th small { display: block; font-weight: 400; color: var(--mute
     <div class="tabs">
         <button class="tab-btn active" data-tab="ask">Ask a Question</button>
         <button class="tab-btn" data-tab="batch">Calibration Results</button>
+        <button class="tab-btn" data-tab="about">About Project</button>
     </div>
 
     <div class="tab-content active" id="tab-ask">
+
+        <div class="doc-panel">
+            <div class="doc-panel-header">Optional: Ground answers in your own document</div>
+
+            <div class="doc-status-active" id="doc-status-active">
+                <span id="doc-status-text"></span>
+                <button class="secondary" id="clear-doc-btn" type="button">Clear document</button>
+            </div>
+
+            <div class="input-row" style="margin-bottom:10px;">
+                <textarea id="doc-paste" rows="4"
+                    placeholder="Paste an FIR / contract / judgment excerpt here to ground answers in THIS document instead of the dataset..."></textarea>
+            </div>
+            <div class="input-row" style="margin-bottom:0;">
+                <button id="index-doc-btn">Index Document</button>
+            </div>
+            <div class="doc-status-msg" id="doc-status-msg"></div>
+        </div>
+
+        <!-- NEW: shown when the backend is mid-way through collecting drafting
+             fields across turns, so the user understands why the next message
+             they type will be treated as form answers rather than a new question. -->
+        <div class="draft-mode-banner" id="draft-mode-banner">
+            <span id="draft-mode-text"></span>
+            <button class="secondary" id="cancel-draft-btn" type="button">Cancel drafting</button>
+        </div>
+
+        <div class="toolbar-row">
+            <button class="ghost" id="new-chat-btn" type="button">🔄 New Conversation</button>
+        </div>
+
         <div class="input-row">
             <select id="lang-select">
                 <option value="en">English</option>
@@ -120,7 +233,7 @@ table.batch-table th small { display: block; font-weight: 400; color: var(--mute
                 <option value="pa">Punjabi</option>
                 <option value="ne">Nepali</option>
             </select>
-            <input type="text" id="question-input" placeholder="Type your legal question here...">
+            <input type="text" id="question-input" placeholder="Type your legal question here... (follow-ups like 'what about the punishment for that?' work too)">
             <button id="ask-btn">Ask</button>
         </div>
         <div class="loading" id="loading">Running LLM1 draft → retrieval → LLM2 critique → refinement...</div>
@@ -130,6 +243,178 @@ table.batch-table th small { display: block; font-weight: 400; color: var(--mute
     <div class="tab-content" id="tab-batch">
         <p style="color:#8b7355; margin-bottom:15px;">Results from <code>run_batch_eval.py</code> — real model outputs checked against the detector.</p>
         <div id="batch-container">Loading...</div>
+    </div>
+
+    <div class="tab-content" id="tab-about">
+        <div class="about-wrap">
+
+            <h2>Overview</h2>
+            <p>
+                A legal question-answering system for Indian law (IPC, CrPC, Constitution) across
+                <b>English, Hindi, Punjabi, and Nepali</b>, built on per-language fine-tuned adapters
+                over a shared <code>Qwen2.5-3B-Instruct</code> base. Fine-tuned models hallucinate —
+                inventing section numbers, contradicting the law they were trained on. This project
+                adds a <b>three-signal hallucination detector</b> (citation grounding, semantic
+                similarity, NLI entailment) and a <b>cross-LLM refinement loop</b> that catches and
+                corrects hallucinated answers before returning them.
+            </p>
+
+            <h2>Problem</h2>
+            <p>
+                Fine-tuned LLMs answering legal questions can confidently state incorrect section
+                numbers, contradict the law via negation flips ("does not include" → "includes"), or
+                drift off-topic — all while sounding fluent. Standard semantic similarity checks miss
+                this: a negated sentence shares ~95% of its words with the correct one, so cosine
+                similarity alone scores it as "grounded" even when it states the opposite of the truth.
+            </p>
+
+            <h2>Architecture</h2>
+            <div class="about-diagram">User Question
+      │
+      ▼
+LaBSE Embedding → FAISS Search (Top-3) → Retrieved Reference
+      │                                          (falls back to a broader
+      │                                           ChromaDB-backed legal
+      │                                           corpus — PDFs + 10K QA
+      │                                           pairs — if the curated
+      │                                           dataset has no confident
+      │                                           match for the topic)
+      ▼
+Qwen2.5-3B + LoRA Adapter (per-language) → Initial Answer
+      │
+      ▼
+Hallucination Detector
+  ├─ Citation Grounding Critic   (regex-extracted section/article numbers
+  │                                checked against retrieved reference +
+  │                                full dataset-wide citation index)
+  ├─ Semantic Similarity Critic  (LaBSE cosine similarity + BLEU/ROUGE-L)
+  └─ Entailment Critic           (XLM-R/XNLI: catches negation/contradiction
+                                   that similarity alone misses)
+      │
+      ├── LIKELY GROUNDED ──────────────────► Return answer
+      │
+      └── HALLUCINATION DETECTED
+                │
+                ▼
+          Critic LLM (LLM2) reviews draft strictly against retrieved
+          reference — cannot introduce new facts, only flag discrepancies
+                │
+                ▼
+          LLM1 regenerates using reference + critique as context
+                │
+                ▼
+          Re-run Hallucination Detector → Final Answer
+
+Separately, requests are routed by intent (legal_knowledge / document_qa /
+explanation / drafting) before any of the above runs:
+  • document_qa / explanation ground against a user-uploaded document
+    (FIR, contract, judgment excerpt), chunked + embedded on the fly.
+  • drafting is template + slot-filling (no free generation, so nothing
+    for the detector to check — output is a substitution, not invented text).</div>
+
+            <h2>Key design decisions</h2>
+            <ul class="about-decision-list">
+                <li><b>Retrieval is by question, not by generated answer.</b> Embedding a hallucinated answer for retrieval would pull an unrelated reference, compounding the error. Retrieval stays independent of whether the draft is trustworthy.</li>
+                <li><b>Citation checking is regex + set lookup, not an LLM judgment call</b> — it can't itself hallucinate. Every citation is checked both against the specific retrieved reference AND the full dataset-wide citation index, to catch cases where a real citation is grounded in the wrong reference.</li>
+                <li><b>The critic LLM (LLM2) is explicitly forbidden from introducing new legal facts</b> — it can only compare the draft against the retrieved reference text it's shown, so a hallucinating critic can't inject fabricated law into the "corrected" answer.</li>
+                <li><b>Similarity alone cannot detect negation.</b> "Includes X" vs "does not include X" score ~0.82 cosine similarity. A dedicated NLI entailment critic checks logical polarity independent of topical similarity, and forces the grounding score down whenever a contradiction is detected — regardless of how clean the other signals look.</li>
+                <li><b>Grounding score vs. hallucination score are kept mutually consistent</b> (<code>hallucination_score = 1 - grounding_score</code>) and both are always returned, so downstream consumers can't accidentally read the wrong polarity.</li>
+                <li><b>The curated FAISS dataset stays primary; a broader ChromaDB corpus is a fallback, not a replacement.</b> The curated dataset has a hand-verified citation index and narrow, reliable coverage; a second knowledge base built from raw legal_corpus PDFs + a 10K QA set is only consulted when the curated dataset reports no confident reference — keeping the system's most-trusted source first in line.</li>
+            </ul>
+
+            <h2>Pipeline stages</h2>
+            <table class="about-table">
+                <thead><tr><th>Stage</th><th>Component</th><th>File</th></tr></thead>
+                <tbody>
+                    <tr><td>Retrieval</td><td>FAISS + LaBSE</td><td><code>build_faiss_index.py</code>, <code>hallucination_detector.py</code></td></tr>
+                    <tr><td>Broader fallback retrieval</td><td>ChromaDB + LaBSE (PDFs + 10K QA corpus)</td><td><code>general_knowledge_base.py</code>, <code>build_chroma_index.py</code></td></tr>
+                    <tr><td>Generation (LLM1)</td><td>Qwen2.5-3B + per-language LoRA adapters</td><td><code>model_loader.py</code></td></tr>
+                    <tr><td>Citation grounding</td><td>Regex extraction + dataset-wide citation index</td><td><code>citation_utils.py</code></td></tr>
+                    <tr><td>Semantic similarity</td><td>LaBSE cosine similarity, BLEU, ROUGE-L</td><td><code>hallucination_detector.py</code></td></tr>
+                    <tr><td>Entailment / contradiction</td><td>XLM-R fine-tuned on XNLI</td><td><code>entailment_checker.py</code></td></tr>
+                    <tr><td>Critique (LLM2)</td><td>Qwen2.5-3B, grounded strictly in retrieved reference</td><td><code>critic_llm.py</code></td></tr>
+                    <tr><td>Intent routing</td><td>Keyword heuristic + LLM fallback classifier</td><td><code>intent_classifier.py</code></td></tr>
+                    <tr><td>Multi-turn memory</td><td>Follow-up question rewriting</td><td><code>conversation_memory.py</code></td></tr>
+                    <tr><td>Document grounding</td><td>Per-upload in-memory FAISS + reranker</td><td><code>document_index.py</code></td></tr>
+                    <tr><td>Drafting</td><td>Template retrieval + slot extraction (no free generation)</td><td><code>draft_generator.py</code></td></tr>
+                    <tr><td>Refinement orchestration</td><td>Full detect → critique → refine loop</td><td><code>cross_llm_refinement.py</code></td></tr>
+                    <tr><td>Serving</td><td>Flask REST API + dashboard</td><td><code>app.py</code>, <code>templates/index.html</code></td></tr>
+                    <tr><td>Calibration</td><td>Batch eval against gold-labeled test cases</td><td><code>run_batch_eval.py</code></td></tr>
+                </tbody>
+            </table>
+
+            <h2>Model training</h2>
+            <p>
+                Each language has its own LoRA adapter, trained independently on Kaggle's free-tier GPU via 4-bit QLoRA:
+            </p>
+            <ul class="about-decision-list">
+                <li><b>Base model:</b> <code>Qwen/Qwen2.5-3B-Instruct</code></li>
+                <li><b>Quantization:</b> 4-bit NF4 (<code>bitsandbytes</code>), bf16 compute dtype, double quantization</li>
+                <li><b>LoRA config:</b> rank 16, alpha 32, dropout 0.05, targeting all attention and MLP projections (<code>q/k/v/o_proj</code>, <code>gate/up/down_proj</code>) — ~30M trainable params (~1% of the 3.1B total)</li>
+                <li><b>Format:</b> each Q&A pair is rendered through the Qwen chat template with a system prompt fixing the target language, so one base model architecture serves all four adapters</li>
+            </ul>
+            <p>
+                <b>Kaggle session limits meant training couldn't run start-to-finish in one sitting</b> — each language's training was checkpointed and resumed across multiple sessions (in Punjabi's case, across a separate Kaggle account after exhausting another's weekly GPU quota). Checkpoints were re-uploaded as Kaggle datasets and reloaded via <code>PeftModel.from_pretrained(..., is_trainable=True)</code> to continue training exactly where it left off.
+            </p>
+
+            <h3 style="margin: 16px 0 8px; color: var(--primary); font-size: 1.05rem;">Training results</h3>
+            <table class="about-table">
+                <thead><tr><th>Language</th><th>Train samples</th><th>Steps</th><th>Final train loss</th><th>Final val loss</th></tr></thead>
+                <tbody>
+                    <tr><td>English</td><td>12,537</td><td>783</td><td>7.04</td><td>0.92</td></tr>
+                    <tr><td>Hindi</td><td>11,995</td><td>750</td><td>0.65</td><td>0.66</td></tr>
+                    <tr><td>Nepali</td><td>12,132</td><td>759</td><td>0.58</td><td>0.57</td></tr>
+                    <tr><td>Punjabi</td><td>12,006</td><td>751</td><td>0.41</td><td>0.40</td></tr>
+                </tbody>
+            </table>
+            <div class="about-callout">
+                <b>English's train/val loss gap looks like a bug, not a language difference.</b> Hindi, Nepali, and Punjabi all show training loss and validation loss tracking within ~0.02–0.05 of each other at every logged step (e.g. Punjabi step 100: train 0.589 / val 0.573; step 600: train 0.400 / val 0.408). English's training loss instead sits 6–7 points <i>above</i> its own validation loss throughout the run (train 7.04 vs. val 0.92 at the final step) — training loss should never be that far above validation loss for the same model on the same objective. Since three of four languages show train/val staying tightly coupled and only English diverges, this points to something specific to the English training cell (e.g. a difference in how loss is logged/reduced, gradient-accumulation scaling, or label masking) rather than English legal text being genuinely ~10x harder to model. This should be root-caused — and the English run likely re-trained — before citing these numbers side-by-side as comparable across languages.
+            </div>
+            <p>
+                Additionally, <code>hindi_part2.ipynb</code> includes a standalone <b>adapter-vs-base-model evaluation</b>: 50 held-out Hindi validation questions run through both the fine-tuned adapter and the un-tuned base model, scored on cosine similarity (via <code>all-MiniLM-L6-v2</code>), BLEU, and ROUGE-L against the gold answer. This is a distinct, smaller-scale sanity check from the embedder used in production retrieval/detection (<code>sentence-transformers/LaBSE</code>) — the two serve different purposes (one-off adapter quality check vs. live retrieval/grounding) and shouldn't be conflated.
+            </p>
+
+            <h2>Calibration &amp; evaluation</h2>
+            <p>
+                <code>run_batch_eval.py</code> runs the detector against a hand-labeled test set spanning 5 gold classes (<code>grounded</code>, <code>fabricated_citation</code>, <code>off_topic</code>, <code>contradiction</code>, <code>no_reference</code>) across all 4 languages, including out-of-distribution control questions (BNS — a law not present in the training corpus) to verify the detector correctly abstains rather than fabricating a confident answer. Output includes a full confusion matrix and per-class precision/recall/F1, written to <code>results_batch.csv</code>.
+            </p>
+
+            <h2>Stack</h2>
+            <div class="stack-pills">
+                <span class="stack-pill">Qwen2.5-3B-Instruct</span>
+                <span class="stack-pill">4-bit QLoRA (PEFT + bitsandbytes)</span>
+                <span class="stack-pill">sentence-transformers/LaBSE</span>
+                <span class="stack-pill">FAISS</span>
+                <span class="stack-pill">ChromaDB</span>
+                <span class="stack-pill">xlm-roberta-large-xnli</span>
+                <span class="stack-pill">HuggingFace Transformers</span>
+                <span class="stack-pill">PyTorch</span>
+                <span class="stack-pill">Flask</span>
+                <span class="stack-pill">Chart.js</span>
+            </div>
+
+            <h2>Run it</h2>
+            <div class="about-codeblock"><span class="cmt"># builds FAISS index + citation index from data/</span>
+python build_faiss_index.py
+
+<span class="cmt"># builds the broader ChromaDB corpus from legal_corpus/ PDFs + 10K QA json</span>
+python build_chroma_index.py
+
+<span class="cmt"># calibration pass, writes results_batch.csv</span>
+python run_batch_eval.py
+
+<span class="cmt"># serves the dashboard at localhost:5000</span>
+python app.py</div>
+
+            <h2>Limitations</h2>
+            <ul class="limitation-list">
+                <li>Calibration set size is limited; current scores should be read as directional rather than statistically robust until the eval set is scaled up.</li>
+                <li>English's training run shows an unexplained train/val loss divergence not present in the other three languages (see note above) — likely a logging or setup bug in that specific notebook cell, not a genuine difficulty difference. Root cause is still open; treat the English adapter's training as provisional until it's resolved.</li>
+                <li>The initial answer (LLM1's first pass) is generated without retrieval context — retrieval is only injected during the refinement step, after a hallucination is first detected. This is retrieval-augmented <i>correction</i>, not retrieval-augmented <i>generation</i> in the standard sense.</li>
+                <li>The broader ChromaDB corpus is unverified relative to the curated FAISS dataset (chunked PDFs, unverified 10K QA pairs) — it's used strictly as a fallback, and its confidence threshold is a starting estimate pending its own calibration pass.</li>
+            </ul>
+
+        </div>
     </div>
 </div>
 
@@ -153,12 +438,130 @@ const loading = document.getElementById("loading");
 const resultContainer = document.getElementById("result-container");
 let chartCounter = 0;
 
+// ── Conversation session state ──
+// A fresh session_id per page load / "New Conversation" click. Sent with
+// every /ask call so the backend can resolve follow-ups ("what about the
+// punishment for that?") against this session's recent turns.
+let sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+
+// ── NEW: drafting form-fill state ──
+// While a drafting request is missing required fields, the backend returns
+// {"status": "missing_fields", "collected_slots": {...}, ...} instead of the
+// usual verdict/grounding shape. We hold onto collected_slots client-side
+// and resend it as `known_slots` on the NEXT /ask call, so the user's next
+// message ("the rent is 15000 and it starts 1 August") gets merged with
+// what they already gave rather than starting the form over from scratch.
+let draftState = { active: false, template: null, known_slots: {} };
+
+const draftModeBanner = document.getElementById("draft-mode-banner");
+const draftModeText = document.getElementById("draft-mode-text");
+const cancelDraftBtn = document.getElementById("cancel-draft-btn");
+
+function setDraftState(newState) {
+    draftState = newState;
+    if (draftState.active) {
+        draftModeText.textContent = `✍️ Drafting a ${draftState.template.replace(/_/g, " ")} — your next message will fill in the remaining details.`;
+        draftModeBanner.classList.add("show");
+    } else {
+        draftModeBanner.classList.remove("show");
+    }
+}
+
+cancelDraftBtn.addEventListener("click", () => {
+    setDraftState({ active: false, template: null, known_slots: {} });
+});
+
+document.getElementById("new-chat-btn").addEventListener("click", async () => {
+    try {
+        await fetch("/reset_session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: sessionId })
+        });
+    } catch (err) {
+        // Non-fatal — starting a new session_id client-side still works
+        // even if the reset call fails (old session just goes idle/expires).
+    }
+    sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+    setDraftState({ active: false, template: null, known_slots: {} });
+    resultContainer.innerHTML = "";
+    questionInput.value = "";
+    questionInput.focus();
+});
+
+// ── Document upload state ──
+const docPaste = document.getElementById("doc-paste");
+const indexDocBtn = document.getElementById("index-doc-btn");
+const clearDocBtn = document.getElementById("clear-doc-btn");
+const docStatusActive = document.getElementById("doc-status-active");
+const docStatusText = document.getElementById("doc-status-text");
+const docStatusMsg = document.getElementById("doc-status-msg");
+let activeDocId = null;
+let activeDocName = null;
+
+indexDocBtn.addEventListener("click", handleIndexDocument);
+clearDocBtn.addEventListener("click", clearActiveDocument);
+
+async function handleIndexDocument() {
+    const text = docPaste.value.trim();
+    docStatusMsg.classList.remove("error");
+    if (!text) {
+        docStatusMsg.textContent = "Paste some document text first.";
+        docStatusMsg.classList.add("error");
+        return;
+    }
+
+    indexDocBtn.disabled = true;
+    docStatusMsg.textContent = "Indexing document...";
+
+    try {
+        const res = await fetch("/upload_document", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, lang: langSelect.value, doc_name: "pasted_document" })
+        });
+        const data = await res.json();
+        indexDocBtn.disabled = false;
+
+        if (data.error) {
+            docStatusMsg.textContent = "Error: " + data.error;
+            docStatusMsg.classList.add("error");
+            return;
+        }
+
+        activeDocId = data.doc_id;
+        activeDocName = data.doc_name;
+        docStatusMsg.textContent = "";
+        docStatusText.textContent = `📄 Grounding in uploaded document (${data.chunk_count} chunks indexed) — questions below will use this instead of the dataset.`;
+        docStatusActive.classList.add("show");
+    } catch (err) {
+        indexDocBtn.disabled = false;
+        docStatusMsg.textContent = "Error: " + err.message;
+        docStatusMsg.classList.add("error");
+    }
+}
+
+function clearActiveDocument() {
+    activeDocId = null;
+    activeDocName = null;
+    docPaste.value = "";
+    docStatusMsg.textContent = "";
+    docStatusActive.classList.remove("show");
+}
+
 askBtn.addEventListener("click", handleAsk);
 questionInput.addEventListener("keypress", e => { if (e.key === "Enter") handleAsk(); });
+
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+}
 
 function verdictClass(verdict) {
     if (!verdict) return "verdict-noref";
     if (verdict.includes("GROUNDED")) return "verdict-grounded";
+    if (verdict.includes("ABSTAIN")) return "verdict-abstain";
     if (verdict.includes("NO CONFIDENT")) return "verdict-noref";
     return "verdict-hallucination";
 }
@@ -197,31 +600,65 @@ async function handleAsk() {
 
     askBtn.disabled = true;
     loading.style.display = "block";
-    resultContainer.innerHTML = "";
+    loading.textContent = draftState.active
+        ? "Filling in your document template..."
+        : (activeDocId
+            ? "Running LLM1 draft → document retrieval → LLM2 critique → refinement..."
+            : "Running LLM1 draft → retrieval → LLM2 critique → refinement...");
+
+    // NOTE: every question is inserted at the TOP of resultContainer, not
+    // appended to the bottom — so the most recent turn is always visible
+    // first, without scrolling past earlier ones.
+    const turnDiv = document.createElement("div");
+    turnDiv.className = "chat-turn";
+    turnDiv.innerHTML = `<div class="user-question">🧑 ${escapeHtml(question)}</div>`;
+    resultContainer.insertBefore(turnDiv, resultContainer.firstChild);
+
+    questionInput.value = "";   // clear immediately so the next question can be typed right away
+    questionInput.focus();
 
     try {
+        const body = { question, lang, session_id: sessionId };
+        if (activeDocId) body.doc_id = activeDocId;
+        // NEW: while mid-draft, resend whatever slots we've already collected
+        // so the backend merges them with anything new in this message.
+        if (draftState.active) body.known_slots = draftState.known_slots || {};
+
         const res = await fetch("/ask", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ question, lang })
+            body: JSON.stringify(body)
         });
         const data = await res.json();
         loading.style.display = "none";
         askBtn.disabled = false;
 
         if (data.error) {
-            resultContainer.innerHTML = `<div class="section" style="color:red;">${data.error}</div>`;
+            if (data.error.toLowerCase().includes("document session expired") || data.error.toLowerCase().includes("not found")) {
+                clearActiveDocument();
+            }
+            turnDiv.innerHTML += `<div class="section" style="color:red;">${escapeHtml(data.error)}</div>`;
             return;
         }
-        renderResult(data);
+        renderResult(data, turnDiv);
+        turnDiv.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
         loading.style.display = "none";
         askBtn.disabled = false;
-        resultContainer.innerHTML = `<div class="section" style="color:red;">Error: ${err.message}</div>`;
+        turnDiv.innerHTML += `<div class="section" style="color:red;">Error: ${escapeHtml(err.message)}</div>`;
     }
 }
 
-function renderResultCard(stageLabelClass, stageLabelText, answer, result) {
+function renderRetrievalWarning(result) {
+    const vi = result && result.verification_info;
+    if (!vi || !vi.citation_queried || vi.citation_queried.length === 0 || vi.matched_index !== null) {
+        return "";
+    }
+    const cited = vi.citation_queried.join(", ");
+    return `<div class="retrieval-warning">⚠️ The question named Section/Article ${escapeHtml(cited)}, but none of the retrieved candidates actually cite it — retrieval may have grabbed the wrong law. Treat this answer with extra caution.</div>`;
+}
+
+function renderResultCard(stageLabelClass, stageLabelText, answer, result, groundedInDoc) {
     if (!result) return "";
     const vClass = verdictClass(result.verdict);
     const ref = result.retrieved_reference;
@@ -229,6 +666,7 @@ function renderResultCard(stageLabelClass, stageLabelText, answer, result) {
     const sc = result.similarity_check;
     const grounding = getGroundingScore(result);
     const hallucination = getHallucinationScore(result);
+    const retrievalWarningHTML = renderRetrievalWarning(result);
 
     let citationHTML = "";
     if (cc) {
@@ -268,49 +706,170 @@ function renderResultCard(stageLabelClass, stageLabelText, answer, result) {
             </div>`;
     }
 
+    const refLabel = groundedInDoc ? `Uploaded Document Chunk (${ref ? ref.lang : ""})` : (ref ? `Retrieved Reference (${ref.lang}, ${ref.act})` : "");
+
     return `
         <div class="result-card">
             <div style="padding: 10px 18px 0;"><span class="stage-label ${stageLabelClass}">${stageLabelText}</span></div>
             <div class="verdict-banner ${vClass}">${result.verdict}</div>
+            ${retrievalWarningHTML ? `<div style="padding: 0 18px;">${retrievalWarningHTML}</div>` : ""}
             <div class="section">
                 <div class="section-label">Answer</div>
                 <div class="section-body">${answer}</div>
             </div>
             ${ref ? `
             <div class="section">
-                <div class="section-label">Retrieved Reference (${ref.lang}, ${ref.act})</div>
-                <div class="section-body"><b>Q:</b> ${ref.question}<br><b>A:</b> ${ref.answer}</div>
+                <div class="section-label">${refLabel}</div>
+                <div class="section-body">${groundedInDoc ? `${ref.answer}` : `<b>Q:</b> ${ref.question}<br><b>A:</b> ${ref.answer}`}</div>
             </div>` : ""}
             ${citationHTML}
             ${scoresHTML}
         </div>`;
 }
 
-function renderResult(data) {
+// ── NEW: renders the drafting branch's response shape ──
+// {"status": "no_template_match"} |
+// {"status": "missing_fields", "template", "missing_fields", "missing_fields_prompts", "collected_slots"} |
+// {"status": "drafted", "template", "document_text", "collected_slots"}
+// Deliberately its own card, not routed through renderResultCard(), since
+// there's no verdict/grounding_score/citation_check here — nothing in this
+// response came from the hallucination detector, it's a template
+// substitution (see draft_generator.py).
+function renderDraftingResult(data, targetEl) {
+    let html = `<div style="padding: 0 0 10px;"><span class="stage-label stage-draft">Drafting</span></div>`;
+
+    if (data.status === "no_template_match") {
+        setDraftState({ active: false, template: null, known_slots: {} });
+        html += `
+            <div class="section">
+                <div class="section-body no-template-note">
+                    I couldn't match this to a template I know (rental agreement, legal notice, RTI application).
+                    Try naming the document type directly — e.g. "draft a rental agreement" or "draft an RTI application".
+                </div>
+            </div>`;
+    } else if (data.status === "missing_fields") {
+        setDraftState({
+            active: true,
+            template: data.template,
+            known_slots: data.collected_slots || {}
+        });
+        const prompts = data.missing_fields_prompts || {};
+        const missingItems = (data.missing_fields || [])
+            .map(f => `<li>${escapeHtml(prompts[f] || f)}</li>`)
+            .join("");
+        const haveItems = Object.entries(data.collected_slots || {})
+            .map(([k, v]) => `<li><b>${escapeHtml(k.replace(/_/g, " "))}:</b> ${escapeHtml(v)}</li>`)
+            .join("");
+
+        html += `
+            <div class="section">
+                <div class="section-label">Template matched</div>
+                <div class="section-body">${escapeHtml((data.template || "").replace(/_/g, " "))}</div>
+            </div>
+            ${haveItems ? `
+            <div class="section">
+                <div class="section-label">Details collected so far</div>
+                <div class="section-body"><ul class="draft-missing-list">${haveItems}</ul></div>
+            </div>` : ""}
+            <div class="section">
+                <div class="section-label">Still needed</div>
+                <div class="section-body">
+                    <ul class="draft-missing-list">${missingItems}</ul>
+                    <div class="draft-hint">Reply with these details in your next message — what you've already given will be kept, not asked again.</div>
+                </div>
+            </div>`;
+    } else if (data.status === "drafted") {
+        setDraftState({ active: false, template: null, known_slots: {} });
+        html += `
+            <div class="section">
+                <div class="section-label">Template used</div>
+                <div class="section-body">${escapeHtml((data.template || "").replace(/_/g, " "))}</div>
+            </div>
+            <div class="section">
+                <div class="section-label">Drafted Document</div>
+                <div class="draft-document-text">${escapeHtml(data.document_text || "")}</div>
+            </div>
+            <div class="section" style="color:var(--muted); font-size:0.8rem; font-style:italic;">
+                This is a template filled in with the details you provided — not free-generated text, so nothing here was invented by the model.
+            </div>`;
+    }
+
+    targetEl.innerHTML += html;
+}
+
+// ── NEW: renders the explanation branch's response shape ──
+// {"verified": false, "answer", "chunk_count", "reason", ...} — a whole-
+// document summary, deliberately NOT shown with a verdict banner or
+// grounding score, since explain_document() doesn't run the hallucination
+// detector (see that function's docstring for why).
+function renderExplanationResult(data, targetEl) {
+    let html = `<div style="padding: 0 0 10px;"><span class="stage-label stage-explain">Document Explanation</span></div>`;
+    html += `
+        <div class="section" style="color:var(--muted); font-size:0.8rem; font-style:italic;">
+            ${escapeHtml(data.reason || "Summary — not scored by the hallucination detector.")}
+        </div>
+        <div class="section">
+            <div class="section-label">Plain-Language Explanation</div>
+            <div class="section-body">${escapeHtml(data.answer || "")}</div>
+        </div>
+        <div class="section" style="color:var(--muted); font-size:0.8rem;">
+            Based on ${data.chunk_count ?? "?"} indexed chunk(s) of your uploaded document.
+        </div>`;
+    targetEl.innerHTML += html;
+}
+
+function renderResult(data, targetEl) {
+    targetEl = targetEl || resultContainer;
+
+    // ── NEW: branch on intent/status FIRST ──
+    // drafting and explanation responses have a completely different shape
+    // than document_qa/legal_knowledge (no verdict, no initial_result, no
+    // grounding score) — routing them into the old rendering path would
+    // either crash on missing fields or silently show blank sections.
+    if (data.status !== undefined) {
+        renderDraftingResult(data, targetEl);
+        return;
+    }
+    if (data.intent === "explanation") {
+        renderExplanationResult(data, targetEl);
+        return;
+    }
+
     let html = "";
+    const groundedInDoc = !!data.doc_id;
+
+    if (groundedInDoc) {
+        html += `<div class="section" style="padding-left:0; color:var(--muted); font-size:0.85rem;">📄 Answer grounded in your uploaded document, not the static dataset.</div>`;
+    } else if (data.source === "general_kb") {
+        html += `<div class="section" style="padding-left:0; color:var(--muted); font-size:0.85rem;">📚 Curated dataset had no confident match — answer grounded in the broader legal corpus instead.</div>`;
+    }
+
+    if (data.resolved_question && data.resolved_question.trim() !== (data.question || "").trim()) {
+        html += `<div class="interpreted-note">💬 Interpreted as: "${escapeHtml(data.resolved_question)}" (using earlier conversation)</div>`;
+    }
 
     // Stage 1: LLM1 initial draft, always shown
-    html += renderResultCard("stage-llm1", "LLM1 — Initial Draft", data.initial_answer, data.initial_result);
+    html += renderResultCard("stage-llm1", "LLM1 — Initial Draft", data.initial_answer, data.initial_result, groundedInDoc);
 
     if (!data.refinement_ran) {
         html += `<div class="section" style="color:var(--muted); font-style:italic; padding-left:0;">${data.reason || ""}</div>`;
-        resultContainer.innerHTML = html;
+        targetEl.innerHTML += html;
         if (data.initial_result && data.initial_result.top_matches) {
-            renderTopMatchesChart(data.initial_result.top_matches);
+            renderTopMatchesChart(data.initial_result.top_matches, groundedInDoc, targetEl);
         }
-        renderSingleStageExtras(data.initial_answer, data.initial_result);
+        renderSingleStageExtras(data.initial_answer, data.initial_result, targetEl);
         return;
     }
 
     // Stage 2: LLM2 critique
     html += `
         <div class="critique-box">
-            <div class="section-label">LLM2 — Critique (grounded strictly in the retrieved reference)</div>
+            <div class="section-label">LLM2 — Critique (grounded strictly in the retrieved ${groundedInDoc ? "document excerpt" : "reference"})</div>
             ${data.critique}
         </div>`;
 
     // Stage 3: LLM1 refined answer
-    html += renderResultCard("stage-llm1", "LLM1 — Refined Answer", data.refined_answer, data.refined_result);
+    html += renderResultCard("stage-llm1", "LLM1 — Refined Answer", data.refined_answer, data.refined_result, groundedInDoc);
 
     // Delta summary — computed directly from the two result objects rather
     // than trusting a pre-baked "score_delta"/"improved" field from the
@@ -334,14 +893,15 @@ function renderResult(data) {
             — grounding score change: ${deltaText}
         </div>`;
 
-    resultContainer.innerHTML = html;
-    renderComparisonCharts(data);
+    targetEl.innerHTML += html;
+    renderComparisonCharts(data, targetEl);
 }
 
-function renderComparisonCharts(data) {
+function renderComparisonCharts(data, targetEl) {
+    targetEl = targetEl || resultContainer;
     const chartsWrap = document.createElement("div");
     chartsWrap.className = "chart-row";
-    resultContainer.appendChild(chartsWrap);
+    targetEl.appendChild(chartsWrap);
 
     const initial = data.initial_result || {};
     const refined = data.refined_result || {};
@@ -394,7 +954,7 @@ function renderComparisonCharts(data) {
 
     // Chart 4: Top retrieval matches (from initial retrieval — same reference used throughout)
     if (initial.top_matches && initial.top_matches.length > 0) {
-        addChart(chartsWrap, "Top Similar Legal Questions", null, (ctx) => new Chart(ctx, {
+        addChart(chartsWrap, data.doc_id ? "Top Matching Document Chunks" : "Top Similar Legal Questions", null, (ctx) => new Chart(ctx, {
             type: "bar",
             data: {
                 labels: initial.top_matches.map(m => m.question.substring(0, 40) + (m.question.length > 40 ? "..." : "")),
@@ -409,9 +969,7 @@ function renderComparisonCharts(data) {
 
     // Chart 5: Metric profile radar — Initial vs Refined on one chart, using
     // every numeric signal the detector actually returns (grounding, raw
-    // similarity, BLEU, ROUGE-L, retrieval confidence). This is the radar
-    // view from the earlier dashboard, adapted to the fields this backend
-    // produces instead of a fixed precision/recall/F1/BERTScore set.
+    // similarity, BLEU, ROUGE-L, retrieval confidence).
     addChart(chartsWrap, "Metric Profile Comparison", null, (ctx) => new Chart(ctx, {
         type: "radar",
         data: {
@@ -447,7 +1005,7 @@ function renderComparisonCharts(data) {
     // answer, token by token: green = appears in reference, red = doesn't.
     const tokenRow = document.createElement("div");
     tokenRow.className = "chart-row";
-    resultContainer.appendChild(tokenRow);
+    targetEl.appendChild(tokenRow);
 
     const initRefText = initial.retrieved_reference ? initial.retrieved_reference.answer : "";
     const refRefText = refined.retrieved_reference ? refined.retrieved_reference.answer : initRefText;
@@ -458,12 +1016,13 @@ function renderComparisonCharts(data) {
 
 // Renders a metric radar + token-match chart for the single-stage case
 // (initial draft already grounded, no refinement triggered).
-function renderSingleStageExtras(answerText, result) {
+function renderSingleStageExtras(answerText, result, targetEl) {
+    targetEl = targetEl || resultContainer;
     if (!result || result.grounding_score === undefined && result.hallucination_score === undefined) return;
 
     const chartsWrap = document.createElement("div");
     chartsWrap.className = "chart-row";
-    resultContainer.appendChild(chartsWrap);
+    targetEl.appendChild(chartsWrap);
 
     addChart(chartsWrap, "Metric Profile", null, (ctx) => new Chart(ctx, {
         type: "radar",
@@ -487,7 +1046,7 @@ function renderSingleStageExtras(answerText, result) {
 
     const tokenRow = document.createElement("div");
     tokenRow.className = "chart-row";
-    resultContainer.appendChild(tokenRow);
+    targetEl.appendChild(tokenRow);
     const refText = result.retrieved_reference ? result.retrieved_reference.answer : "";
     addTokenMatchChart(tokenRow, "Initial Draft — Token Match vs. Reference", answerText, refText);
 }
@@ -548,12 +1107,13 @@ function addTokenMatchChart(wrap, title, answerText, referenceText) {
     }, 50);
 }
 
-function renderTopMatchesChart(topMatches) {
+function renderTopMatchesChart(topMatches, groundedInDoc, targetEl) {
+    targetEl = targetEl || resultContainer;
     if (!topMatches || topMatches.length === 0) return;
     const chartsWrap = document.createElement("div");
     chartsWrap.className = "chart-row";
-    resultContainer.appendChild(chartsWrap);
-    addChart(chartsWrap, "Top Similar Legal Questions", null, (ctx) => new Chart(ctx, {
+    targetEl.appendChild(chartsWrap);
+    addChart(chartsWrap, groundedInDoc ? "Top Matching Document Chunks" : "Top Similar Legal Questions", null, (ctx) => new Chart(ctx, {
         type: "bar",
         data: {
             labels: topMatches.map(m => m.question.substring(0, 40) + (m.question.length > 40 ? "..." : "")),
@@ -594,6 +1154,7 @@ async function loadBatchResults() {
 function batchVerdictColor(v) {
     if (!v) return "#999";
     if (v.includes("GROUNDED")) return "#2e7d32";
+    if (v.includes("ABSTAIN")) return "#5e548e";
     if (v.includes("NO CONFIDENT")) return "#b8860b";
     return "#c62828";
 }

@@ -87,3 +87,6 @@ faiss_index/
 
 # LoRA adapters
 adapters/
+
+Add-Content .gitignore "`nchroma_store/"
+git rm --cached -r chroma_store

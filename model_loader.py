@@ -97,8 +97,19 @@ class ModelLoader:
         with open(config_path, "w") as f:
             json.dump(cleaned, f, indent=2)
 
-    def generate(self, lang: str, question: str, context: str = "") -> str:
-        """Generate answer for given language and question"""
+    def generate(self, lang: str, question: str, context: str = "", instruction: str = "") -> str:
+        """Generate answer for given language and question.
+
+        context: grounding material the answer should be based on (a
+        retrieved reference, a document excerpt, reviewer feedback). The
+        model treats this as source material to draw the answer from.
+
+        instruction: a behavioral directive about HOW to answer (e.g.
+        "attribute quoted facts explicitly") — kept in its own labeled
+        section rather than folded into `context`. Mixing the two risks
+        the model treating an instruction sentence as more legal content
+        to ground the answer in, rather than as a directive to follow.
+        """
         from config import LANG_NAMES, MAX_NEW_TOKENS
 
         self.load_adapter(lang)
@@ -109,6 +120,8 @@ class ModelLoader:
         system_prompt = f"You are an expert Indian legal assistant. Answer the following legal question in {lang_name}."
         if context:
             system_prompt += f"\n\nRelevant context:\n{context}"
+        if instruction:
+            system_prompt += f"\n\nInstructions:\n{instruction}"
 
         messages = [
             {"role": "system", "content": system_prompt},
