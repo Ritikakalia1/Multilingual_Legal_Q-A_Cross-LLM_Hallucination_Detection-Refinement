@@ -1,4 +1,4 @@
-# Indian Legal Q&A — Hallucination Detector
+# Indian_Multilingual_Legal_Q-A_Cross-LLM_Hallucination_Detection-Refinement
 
 **Cross-LLM refinement: fine-tuned draft → grounded critique → regeneration**
 
